@@ -2,134 +2,96 @@
 session_start();
 include("../db.php");
 
-if(!isset($_SESSION['admin_id']) || $_SESSION['role'] != 'admin'){
-    header("Location: admin_login.php");
-    exit();
+if(!isset($_SESSION['admin_id']) || $_SESSION['role']!='admin'){
+header("Location: admin_login.php");
+exit();
 }
 
-/* Delete order */
+/* DELETE */
 if(isset($_GET['delete'])){
-    $id = intval($_GET['delete']);
-    mysqli_query($conn,"DELETE FROM orders WHERE id=$id");
-    echo "<script>alert('Order Deleted'); window.location='orders.php';</script>";
+$id=intval($_GET['delete']);
+mysqli_query($conn,"DELETE FROM orders WHERE id=$id");
+echo "<script>alert('Order Deleted');window.location='orders.php';</script>";
 }
 
+/* CONFIRM */
+if(isset($_GET['confirm'])){
+$id=intval($_GET['confirm']);
+$msg="Your order has been confirmed by admin";
 
-/* -------------------------
-   ORDER FILTER
---------------------------*/
+mysqli_query($conn,"UPDATE orders 
+SET status='Confirmed', message='$msg', confirm_time=NOW()
+WHERE id=$id");
 
-$order_type = isset($_GET['order_type']) ? $_GET['order_type'] : 'monthly';
-
-if($order_type == "weekly"){
-$order_query = "
-SELECT o.*, f.cost_price
-FROM orders o
-LEFT JOIN food_items f ON o.food_name = f.food_name
-WHERE YEARWEEK(o.created_at,1)=YEARWEEK(CURDATE(),1)
-ORDER BY o.id DESC";
+header("Location: orders.php");
 }
 
-elseif($order_type == "quarterly"){
-$order_query = "
-SELECT o.*, f.cost_price
-FROM orders o
-LEFT JOIN food_items f ON o.food_name = f.food_name
-WHERE QUARTER(o.created_at)=QUARTER(CURDATE())
-AND YEAR(o.created_at)=YEAR(CURDATE())
-ORDER BY o.id DESC";
+/* CANCEL */
+if(isset($_GET['cancel'])){
+$id=intval($_GET['cancel']);
+$msg="Your order has been cancelled by admin";
+
+mysqli_query($conn,"UPDATE orders 
+SET status='Cancelled', message='$msg'
+WHERE id=$id");
+
+header("Location: orders.php");
 }
 
-elseif($order_type == "yearly"){
-$order_query = "
-SELECT o.*, f.cost_price
-FROM orders o
-LEFT JOIN food_items f ON o.food_name = f.food_name
-WHERE YEAR(o.created_at)=YEAR(CURDATE())
-ORDER BY o.id DESC";
+/* FILTER */
+$type = $_GET['type'] ?? "all";
+$where="1";
+
+/* WEEK = DATE RANGE */
+if($type=="week"){
+$start=$_GET['start_date'] ?? '';
+$end=$_GET['end_date'] ?? '';
+
+if($start && $end && $start <= $end){
+$where="DATE(created_at) BETWEEN '$start' AND '$end'";
+}
 }
 
-else{
-$order_query = "
-SELECT o.*, f.cost_price
-FROM orders o
-LEFT JOIN food_items f ON o.food_name = f.food_name
-WHERE MONTH(o.created_at)=MONTH(CURDATE())
-AND YEAR(o.created_at)=YEAR(CURDATE())
-ORDER BY o.id DESC";
+/* MONTH */
+elseif($type=="month"){
+$sm=$_GET['start_month'] ?? '';
+$em=$_GET['end_month'] ?? '';
+$year=$_GET['year'] ?? '';
+
+if($sm && $em && $year && $sm <= $em){
+$where="MONTH(created_at) BETWEEN $sm AND $em AND YEAR(created_at)='$year'";
+}
 }
 
-$order_result = mysqli_query($conn,$order_query);
+/* QUARTER = CUSTOM MONTH */
+elseif($type=="quarter"){
+$sm=$_GET['start_month'] ?? '';
+$em=$_GET['end_month'] ?? '';
 
-
-
-/* -------------------------
-   PROFIT FILTER
---------------------------*/
-
-$type = isset($_GET['type']) ? $_GET['type'] : 'monthly';
-
-if($type == "weekly"){
-
-$query = "
-SELECT CONCAT(YEAR(o.created_at),' - Week ',WEEK(o.created_at)) AS period,
-COUNT(o.id) AS total_orders,
-SUM(o.total_amount) AS total_sales,
-SUM(f.cost_price * o.quantity) AS total_cost,
-SUM(o.total_amount - (f.cost_price * o.quantity)) AS total_profit
-FROM orders o
-LEFT JOIN food_items f ON o.food_name = f.food_name
-GROUP BY YEAR(o.created_at), WEEK(o.created_at)
-ORDER BY o.created_at DESC";
-
+if($sm && $em && $sm <= $em){
+$where="MONTH(created_at) BETWEEN $sm AND $em";
+}
 }
 
-elseif($type == "quarterly"){
+/* YEAR */
+elseif($type=="year"){
+$sy=$_GET['start_year'] ?? '';
+$ey=$_GET['end_year'] ?? '';
 
-$query = "
-SELECT CONCAT(YEAR(o.created_at),' Q',QUARTER(o.created_at)) AS period,
-COUNT(o.id) AS total_orders,
-SUM(o.total_amount) AS total_sales,
-SUM(f.cost_price * o.quantity) AS total_cost,
-SUM(o.total_amount - (f.cost_price * o.quantity)) AS total_profit
-FROM orders o
-LEFT JOIN food_items f ON o.food_name = f.food_name
-GROUP BY YEAR(o.created_at), QUARTER(o.created_at)
-ORDER BY o.created_at DESC";
-
+if($sy && $ey && $sy <= $ey){
+$where="YEAR(created_at) BETWEEN $sy AND $ey";
+}
 }
 
-elseif($type == "yearly"){
+$order_query="SELECT * FROM orders WHERE $where ORDER BY id DESC";
+$order_result=mysqli_query($conn,$order_query);
 
-$query = "
-SELECT YEAR(o.created_at) AS period,
-COUNT(o.id) AS total_orders,
-SUM(o.total_amount) AS total_sales,
-SUM(f.cost_price * o.quantity) AS total_cost,
-SUM(o.total_amount - (f.cost_price * o.quantity)) AS total_profit
-FROM orders o
-LEFT JOIN food_items f ON o.food_name = f.food_name
-GROUP BY YEAR(o.created_at)
-ORDER BY o.created_at DESC";
-
-}
-
-else{
-
-$query = "
-SELECT DATE_FORMAT(o.created_at,'%Y-%m') AS period,
-COUNT(o.id) AS total_orders,
-SUM(o.total_amount) AS total_sales,
-SUM(f.cost_price * o.quantity) AS total_cost,
-SUM(o.total_amount - (f.cost_price * o.quantity)) AS total_profit
-FROM orders o
-LEFT JOIN food_items f ON o.food_name = f.food_name
-GROUP BY DATE_FORMAT(o.created_at,'%Y-%m')
-ORDER BY o.created_at DESC";
-
-}
-
-$profit_result = mysqli_query($conn,$query);
+/* MONTHS */
+$months = [
+1=>"Jan",2=>"Feb",3=>"Mar",4=>"Apr",
+5=>"May",6=>"Jun",7=>"Jul",8=>"Aug",
+9=>"Sep",10=>"Oct",11=>"Nov",12=>"Dec"
+];
 ?>
 
 <!DOCTYPE html>
@@ -138,55 +100,23 @@ $profit_result = mysqli_query($conn,$query);
 <title>Admin Orders</title>
 
 <style>
-
 body{font-family:Arial;background:#f4f6f9;padding:20px;}
-
-h2{text-align:center;margin-bottom:20px;}
-
-table{
-width:100%;
-border-collapse:collapse;
-background:white;
-box-shadow:0 5px 15px rgba(0,0,0,0.1);
-margin-bottom:40px;
-}
-
-th,td{
-padding:12px;
-border:1px solid #ddd;
-text-align:center;
-}
-
-th{
-background:#ff6b6b;
-color:white;
-}
-
-tr:hover{
-background:#f1f1f1;
-}
-
-.btn{
-padding:6px 12px;
-background:#ff6b6b;
-color:white;
-text-decoration:none;
-border-radius:6px;
-}
-
-.back-btn{
-background:#1e90ff;
-padding:6px 12px;
-color:white;
-text-decoration:none;
-border-radius:6px;
-}
-
-select{
-padding:8px 15px;
-border-radius:6px;
-}
-
+h2{text-align:center;}
+table{width:100%;border-collapse:collapse;background:white;margin-top:20px;}
+th,td{padding:10px;border:1px solid #ddd;text-align:center;}
+th{background:#ff6b6b;color:white;}
+.btn{padding:6px 12px;color:white;text-decoration:none;border-radius:6px;}
+.delete{background:#ff4d4d;}
+.confirm{background:#28a745;}
+.cancel{background:#f39c12;}
+.back-btn{background:#1e90ff;padding:8px 15px;color:white;text-decoration:none;border-radius:6px;}
+.status{padding:5px 10px;border-radius:5px;color:white;}
+.pending{background:orange;}
+.confirmed{background:green;}
+.cancelled{background:red;}
+.filter-box{text-align:center;margin:20px;}
+select,input{padding:8px;margin:5px;}
+button{padding:8px 12px;background:#28a745;color:white;border:none;border-radius:5px;}
 </style>
 
 </head>
@@ -197,25 +127,50 @@ border-radius:6px;
 
 <a href="dashboard.php" class="back-btn">Back to Dashboard</a>
 
+<div class="filter-box">
 
-<!-- ORDER FILTER -->
+<form method="GET">
 
-<form method="GET" style="text-align:center;margin:20px 0;">
-
-<select name="order_type" onchange="this.form.submit()">
-
-<option value="weekly" <?php if($order_type=="weekly") echo "selected"; ?>>Weekly</option>
-
-<option value="monthly" <?php if($order_type=="monthly") echo "selected"; ?>>Monthly</option>
-
-<option value="quarterly" <?php if($order_type=="quarterly") echo "selected"; ?>>Quarterly</option>
-
-<option value="yearly" <?php if($order_type=="yearly") echo "selected"; ?>>Yearly</option>
-
+<select name="type" id="filterType" onchange="showFilter()">
+<option value="all">All</option>
+<option value="week" <?php if($type=="week") echo "selected"; ?>>Week</option>
+<option value="month" <?php if($type=="month") echo "selected"; ?>>Monthly</option>
+<option value="quarter" <?php if($type=="quarter") echo "selected"; ?>>Quarter</option>
+<option value="year" <?php if($type=="year") echo "selected"; ?>>Year</option>
 </select>
+
+<!-- WEEK (DATE RANGE) -->
+<input type="date" name="start_date" id="date1" value="<?php echo $_GET['start_date'] ?? ''; ?>" style="display:none;">
+<input type="date" name="end_date" id="date2" value="<?php echo $_GET['end_date'] ?? ''; ?>" style="display:none;">
+
+<!-- MONTH -->
+<select name="start_month" id="month1" style="display:none;">
+<option value="">Start Month</option>
+<?php foreach($months as $num=>$name){
+$sel = (($_GET['start_month'] ?? '')==$num) ? "selected" : "";
+echo "<option value='$num' $sel>$name</option>";
+} ?>
+</select>
+
+<select name="end_month" id="month2" style="display:none;">
+<option value="">End Month</option>
+<?php foreach($months as $num=>$name){
+$sel = (($_GET['end_month'] ?? '')==$num) ? "selected" : "";
+echo "<option value='$num' $sel>$name</option>";
+} ?>
+</select>
+
+<input type="number" name="year" placeholder="Year" id="monthYear" value="<?php echo $_GET['year'] ?? ''; ?>" style="display:none;">
+
+<!-- YEAR -->
+<input type="number" name="start_year" placeholder="Start Year" id="year1" value="<?php echo $_GET['start_year'] ?? ''; ?>" style="display:none;">
+<input type="number" name="end_year" placeholder="End Year" id="year2" value="<?php echo $_GET['end_year'] ?? ''; ?>" style="display:none;">
+
+<button type="submit">Filter</button>
 
 </form>
 
+</div>
 
 <table>
 
@@ -226,97 +181,87 @@ border-radius:6px;
 <th>Qty</th>
 <th>Total</th>
 <th>Customer</th>
-<th>Address</th>
 <th>Mobile</th>
 <th>Payment</th>
-<th>Order Date</th>
+<th>Status</th>
+<th>Date</th>
 <th>Action</th>
 </tr>
 
 <?php
-
-if(mysqli_num_rows($order_result)>0){
-
 while($row=mysqli_fetch_assoc($order_result)){
 
-echo "<tr>
+$status_class="pending";
+if($row['status']=="Confirmed") $status_class="confirmed";
+if($row['status']=="Cancelled") $status_class="cancelled";
 
+echo "<tr>
 <td>{$row['id']}</td>
 <td>{$row['food_name']}</td>
 <td>₹{$row['price']}</td>
 <td>{$row['quantity']}</td>
 <td>₹{$row['total_amount']}</td>
 <td>{$row['customer_name']}</td>
-<td>{$row['address']}</td>
 <td>{$row['mobile']}</td>
 <td>{$row['payment_method']}</td>
+<td><span class='status $status_class'>{$row['status']}</span></td>
 <td>".date("d M Y",strtotime($row['created_at']))."</td>
+<td>";
 
-<td>
-<a href='orders.php?delete={$row['id']}' class='btn'
-onclick='return confirm(\"Delete order?\")'>Delete</a>
+if($row['status']=="Pending"){
+echo "
+<a href='orders.php?confirm={$row['id']}' class='btn confirm'>Confirm</a>
+<a href='orders.php?cancel={$row['id']}' class='btn cancel'>Cancel</a>
+";
+}
+
+echo "
+<a href='orders.php?delete={$row['id']}' class='btn delete' onclick='return confirm(\"Delete order?\")'>Delete</a>
 </td>
-
 </tr>";
-
 }
-
-}
-
 ?>
 
 </table>
 
+<script>
+function showFilter(){
 
+var type=document.getElementById("filterType").value;
 
-<h2>Profit / Loss Report</h2>
+var ids=['date1','date2','month1','month2','monthYear','year1','year2'];
 
-<form method="GET" style="text-align:center;margin-bottom:20px;">
+ids.forEach(function(id){
+document.getElementById(id).style.display="none";
+});
 
-<select name="type" onchange="this.form.submit()">
-
-<option value="weekly" <?php if($type=="weekly") echo "selected"; ?>>Weekly</option>
-
-<option value="monthly" <?php if($type=="monthly") echo "selected"; ?>>Monthly</option>
-
-<option value="quarterly" <?php if($type=="quarterly") echo "selected"; ?>>Quarterly</option>
-
-<option value="yearly" <?php if($type=="yearly") echo "selected"; ?>>Yearly</option>
-
-</select>
-
-</form>
-
-
-<table>
-
-<tr>
-<th>Period</th>
-<th>Total Orders</th>
-<th>Total Sales</th>
-<th>Total Cost</th>
-<th>Profit / Loss</th>
-</tr>
-
-<?php
-
-while($row=mysqli_fetch_assoc($profit_result)){
-
-echo "<tr>
-
-<td>{$row['period']}</td>
-<td>{$row['total_orders']}</td>
-<td>₹{$row['total_sales']}</td>
-<td>₹{$row['total_cost']}</td>
-<td>₹{$row['total_profit']}</td>
-
-</tr>";
-
+if(type=="week"){
+date1.style.display="inline";
+date2.style.display="inline";
 }
 
-?>
+if(type=="month"){
+month1.style.display="inline";
+month2.style.display="inline";
+monthYear.style.display="inline";
+}
 
-</table>
+if(type=="quarter"){
+month1.style.display="inline";
+month2.style.display="inline";
+}
+
+if(type=="year"){
+year1.style.display="inline";
+year2.style.display="inline";
+}
+}
+
+/* AUTO LOAD */
+window.onload = function(){
+showFilter();
+};
+</script>
 
 </body>
 </html>
