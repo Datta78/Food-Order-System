@@ -1,0 +1,89 @@
+.container button a{
+    text-decoration: none;
+    color: white;
+}
+.right1{
+    border: 0px solid red;
+    display: flex;
+      justify-content: center;
+      align-items: center;
+}
+/*.container .right1{
+      border: 2px solid red;
+      width: 60%;
+      height: 100%;
+
+}*/
+.container{
+    margin-top: 35px;
+    padding: 15px;
+    display: flex;
+    width: 100%;
+    min-height: calc(100vh - 88px);
+    background-color:white;
+}
+
+
+.container .right1 form{
+    border: 0px solid green;
+   
+     width: 650px;
+     height: 550px;
+     padding: 10px;
+     box-shadow:-2px 2px 20px 5px gray;
+}
+
+.right1 .form input[type="text"]{
+     width: 100%;
+     height: 45px;
+     padding: 5px;
+      font-size: 18px;
+      margin-bottom: 15px;
+}
+.right1 .form select{
+    width: 100%;
+    height: 45px;
+    padding: 5px;
+     font-size: 18px;
+     margin-bottom: 15px;
+     color: grey;
+}
+.right1 .form textarea{
+     width: 100%;
+     height: 130px;
+     padding: 5px;
+     font-size: 18px;
+      font-size: 18px;
+      margin-bottom: 15px;
+}
+.right1 .form input[type="submit"]{
+    width: 100%;
+    height: 45px;
+    padding: 5px;
+    border: black;
+}
+.right1 p{
+    text-align: center;
+    font-size: 18px;
+    color: grey;
+}
+.right1 .form input[type="checkbox"]{
+    height: 20px;
+    width: 20px;
+    margin-right: 10px;
+}
+
+.right1 .form span{
+    margin-right: 8px;
+}
+
+
+.right1 .form input[type="submit"]{
+     background-color: orange;
+     font-size: 20px;
+     color: white;
+     outline: none;
+     border: 0px;
+     box-shadow:7px 7px 10px gray;
+     cursor: pointer;
+}
